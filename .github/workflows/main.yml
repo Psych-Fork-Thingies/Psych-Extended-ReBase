@@ -40,6 +40,14 @@ jobs:
             artifactPath: "export/release/android/bin/app/build/outputs/apk/release/*.apk"
             system: Android
 
+          - name: iOS
+            os: macos-15
+            setupCommand: sh ./setup/unix.sh
+            buildArgs: "ios -final -nosign -D officialBuild"
+            artifactName: iOSBuild
+            artifactPath: "export/release/ios/build/Release-iphoneos/*.ipa"
+            system: iOS
+
           - name: Windows-Debug
             os: windows-2022
             buildArgs: "windows -D officialBuild -D debugBuild -D ENABLE_NOVA -final"
@@ -55,6 +63,14 @@ jobs:
             artifactName: androidDebugBuild
             artifactPath: "export/release/android/bin/app/build/outputs/apk/release/*.apk"
             system: Android
+
+          - name: iOS-Debug
+            os: macos-15
+            setupCommand: sh ./setup/unix.sh
+            buildArgs: "ios -nosign -D debugBuild -D ENABLE_NOVA -final"
+            artifactName: iOSDebugBuild
+            artifactPath: "export/release/ios/build/Release-iphoneos/*.ipa"
+            system: iOS
     uses: ./.github/workflows/build.yml
     with:
         name: ${{ matrix.name }}
