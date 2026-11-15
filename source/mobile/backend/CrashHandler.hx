@@ -3,25 +3,17 @@ package mobile.backend;
 import openfl.events.UncaughtErrorEvent;
 import openfl.events.ErrorEvent;
 import openfl.errors.Error;
-import haxe.Date;
-import haxe.DateTools;
+import Date;
+import DateTools;
 import haxe.CallStack;
 
 #if sys
 import sys.FileSystem;
 import sys.io.File;
 #end
-#if js
-import js.Browser;
-#end
-#if java
-import java.lang.Thread;
-#end
-#if cs
-import cs.system.AppDomain;
-#end
 
 using StringTools;
+using flixel.util.FlxArrayUtil;
 
 /**
  * Universal Crash Handler.
@@ -39,30 +31,31 @@ class CrashHandler
 		#if (openfl || flash)
 		try {
 			openfl.Lib.current.loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onUncaughtError);
-		} catch(e:Dynamic) {
-		}
+		} catch(e:Dynamic) {}
 		#end
 
 		#if cpp
 		try {
-			cpp.vm.Thread.setCriticalErrorHandler(onError);
-		} catch(e:Dynamic) {
 			untyped __global__.__hxcpp_set_critical_error_handler(onError);
-		}
+		} catch(e:Dynamic) {}
 		#end
 
 		#if hl
-		hl.Api.setErrorHandler(onError);
+		try {
+			hl.Api.setErrorHandler(onError);
+		} catch(e:Dynamic) {}
 		#end
 
 		#if js
-		js.Browser.window.onerror = function(msg:Dynamic, url:String, line:Int, col:Int, error:Dynamic):Bool {
-			onError("JS Global Error: " + msg + " at " + url + ":" + line + ":" + col);
-			return true;
-		};
-		js.Browser.window.addEventListener("unhandledrejection", function(e:js.html.PromiseRejectionEvent):Void {
-			onError("JS Unhandled Promise Rejection: " + Std.string(e.reason));
-		});
+		try {
+			js.Browser.window.onerror = function(msg:Dynamic, url:String, line:Int, col:Int, error:Dynamic):Bool {
+				onError("JS Global Error: " + msg + " at " + url + ":" + line + ":" + col);
+				return true;
+			};
+			js.Browser.window.addEventListener("unhandledrejection", function(e:js.html.PromiseRejectionEvent):Void {
+				onError("JS Unhandled Promise Rejection: " + Std.string(e.reason));
+			});
+		} catch(e:Dynamic) {}
 		#end
 
 		#if java
@@ -117,7 +110,6 @@ class CrashHandler
 	{
 		if (isHandlingCrash) return;
 		isHandlingCrash = true;
-
 		e.preventDefault();
 		e.stopPropagation();
 		e.stopImmediatePropagation();
@@ -139,7 +131,6 @@ class CrashHandler
 
 		var stackLabel = formatStackTrace(haxe.CallStack.exceptionStack());
 		var fullMessage = "ERROR: " + m + "\n\n[Stack Trace]\n" + stackLabel;
-		
 		if (logBuffer.length > 0) {
 			fullMessage += "\n\n[Recent Logs / Warnings]\n" + logBuffer.join("\n");
 		}
@@ -160,7 +151,6 @@ class CrashHandler
 		var m:String = message != null ? Std.string(message) : "Unknown Critical Error";
 		var stack = haxe.CallStack.exceptionStack(true);
 		var stackLabel = formatStackTrace(stack);
-		
 		var fullMessage = "CRITICAL ERROR: " + m + "\n\n[Stack Trace]\n" + stackLabel;
 		
 		if (logBuffer.length > 0) {
@@ -236,46 +226,20 @@ class CrashHandler
 	#if sys
 	private static function saveErrorMessage(message:String):Void
 	{
-		try 
+		final folder:String = #if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end 'logs/';
+
+		try
 		{
-			var logDir = "";
-			try {
-				logDir = lime.system.System.applicationStorageDirectory;
-			} catch(e:Dynamic) {}
-
-			if (logDir == null || logDir == "") {
-				#if android
-				try {
-					logDir = StorageUtil.getExternalStorageDirectory() + "/";
-				} catch(e:Dynamic) {
-					logDir = "./";
-				}
-				#else
-				logDir = Sys.getCwd();
-				if (logDir == null) logDir = "./";
-				#end
-			}
-
-			if (!logDir.endsWith("/") && !logDir.endsWith("\\")) {
-				logDir += "/";
-			}
-			logDir += "logs/";
-
-			if (!FileSystem.exists(logDir)) {
-				FileSystem.createDirectory(logDir);
-			}
+			if (!FileSystem.exists(folder))
+				FileSystem.createDirectory(folder);
 
 			var dateStr = DateTools.format(Date.now(), "%Y-%m-%d_%H-%M-%S");
-			var filePath = logDir + "crash_" + dateStr + ".txt";
-			
-			File.saveContent(filePath, message);
-			File.saveContent(logDir + "latest_crash.txt", message);
+			File.saveContent(folder + 'crash_${dateStr}.txt', message);
+			File.saveContent(folder + 'latest_crash.txt', message);
 		}
-		catch (e:Dynamic) 
+		catch (e:haxe.Exception)
 		{
-			#if sys
-			Sys.println("Failed to save crash log: " + e);
-			#end
+			trace('Couldn\'t save error message. (${e.message})');
 		}
 	}
 	#end
